@@ -66,6 +66,18 @@ async function fetchBiliJson(url, options) {
     // 2) body 只消费一次，统一按文本读取后再解析。
     const text = await res.text();
 
+
+    let diagnosticCode = null;
+try {
+    diagnosticCode = JSON.parse(text)?.code ?? null;
+} catch {}
+
+console.log("BILI_DIAG", JSON.stringify({
+    path: new URL(url).pathname,
+    httpStatus: res.status,
+    contentType: res.headers.get("content-type"),
+    biliCode: diagnosticCode
+}));
     // 1) 非 2xx 视为反爬 / 异常。优先检查是否是 Vercel 代理本身的报错
     if (!res.ok) {
         if (res.status === 401 || text.includes('Unauthorized')) throw new Error('Vercel 代理鉴权失败：请检查 Cloudflare 上的 PROXY_TOKEN 是否与 Vercel 中的代码一致');
