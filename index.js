@@ -285,6 +285,41 @@ async function getPlayUrlWithFallback(bvid, cid, targetQn, cookie, mixinKey) {
         hasDurl: Boolean(pData.data?.durl?.[0]?.url),
         hasDash: Boolean(pData.data?.dash)
         }));
+        if (qn === 80 && pData.data?.quality < 80) {
+        try {
+            const dashQuery = await signWbi({
+                bvid, cid,
+                qn: 80,
+                fnval: 4048,
+                fnver: 0,
+                fourk: 1
+            }, cookie, mixin_key);
+    
+            const dashInfo = await fetchBiliJson(
+                `https://api.bilibili.com/x/player/wbi/playurl?${dashQuery}`,
+                {
+                    headers: {
+                        'User-Agent': UA,
+                        'Referer': REFERER,
+                        'Cookie': cookie
+                    }
+                }
+            );
+    
+            console.log('BILI_DASH_CHECK', JSON.stringify({
+                code: dashInfo.code,
+                video: (dashInfo.data?.dash?.video || []).map(v => ({
+                    id: v.id,
+                    width: v.width,
+                    height: v.height,
+                    codecs: v.codecs
+                })),
+                audioCount: dashInfo.data?.dash?.audio?.length || 0
+            }));
+        } catch {
+            console.log('BILI_DASH_CHECK', 'request_failed');
+        }
+    }
         if (pData.code === 0 && pData.data?.durl?.[0]?.url) {
             return { url: pData.data.durl[0].url, quality: pData.data.quality };
         }
