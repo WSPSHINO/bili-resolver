@@ -183,6 +183,10 @@ async function getMixinKeyFromNav(cookie) {
     const json = await fetchBiliJson("https://api.bilibili.com/x/web-interface/nav", {
         headers: { 'User-Agent': UA, 'Referer': REFERER, 'Cookie': cookie }
     });
+    console.log('BILI_LOGIN', JSON.stringify({
+    code: json.code,
+    isLogin: json.data?.isLogin ?? null
+    }));
     const { img_url, sub_url } = json.data.wbi_img;
     return getMixinKey(img_url.split('/').pop().split('.')[0] + sub_url.split('/').pop().split('.')[0]);
 }
@@ -266,6 +270,14 @@ async function getPlayUrlWithFallback(bvid, cid, targetQn, cookie, mixinKey) {
         const pData = await fetchBiliJson(`https://api.bilibili.com/x/player/wbi/playurl?${signedQuery}`, {
             headers: { 'User-Agent': UA, 'Referer': REFERER, 'Cookie': cookie }
         });
+        console.log('BILI_WEB_QUALITY', JSON.stringify({
+        requested: qn,
+        code: pData.code,
+        returned: pData.data?.quality ?? null,
+        available: pData.data?.accept_quality ?? [],
+        hasDurl: Boolean(pData.data?.durl?.[0]?.url),
+        hasDash: Boolean(pData.data?.dash)
+        }));
         if (pData.code === 0 && pData.data?.durl?.[0]?.url) {
             return { url: pData.data.durl[0].url, quality: pData.data.quality };
         }
