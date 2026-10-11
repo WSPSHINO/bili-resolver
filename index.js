@@ -273,11 +273,12 @@ async function getPlayUrlWithFallback(bvid, cid, targetQn, cookie, mixinKey) {
     };
 
     for (const qn of qualities) {
-        const lines = [
+        const lines = [];
+        if (navAvailable) lines.push(() => tryWebLine(qn));
+        lines.push(
             () => tryAppLine(qn, APP_KEYS.ios),
             () => tryAppLine(qn, APP_KEYS.tv),
-        ];
-        if (navAvailable) lines.push(() => tryWebLine(qn));
+        );
 
         for (const line of lines) {
             try {
@@ -304,7 +305,9 @@ async function getPlayUrlWithFallback(bvid, cid, targetQn, cookie, mixinKey) {
 // 顺序保留：先 view，view 业务码检查通过后再取一次 nav（mixin_key），最后 playurl。
 // 这样 view 的反爬/业务错误会在任何 nav 请求之前短路，且 nav 在单次解析内只取一次。
 async function resolveVideo(bvid, qn, host) {
-    const cookie = await getAntiCrawlCookie();
+    const cookie =
+        String(WORKER_ENV.BILI_COOKIE || '').trim()
+        || await getAntiCrawlCookie();
 
     const vData = await fetchBiliJson(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
         headers: { 'User-Agent': UA, 'Referer': REFERER, 'Cookie': cookie }
