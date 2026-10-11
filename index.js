@@ -266,7 +266,14 @@ async function getPlayUrlWithFallback(bvid, cid, targetQn, cookie, mixinKey) {
     };
 
     const tryWebLine = async (qn) => {
-        const signedQuery = await signWbi({ bvid, cid, qn, fnval: 1, try_look: 1, platform: 'html5', high_quality: 1 }, cookie, mixin_key);
+        const signedQuery = await signWbi({
+            bvid,
+            cid,
+            qn,
+            fnval: 1,
+            fnver: 0,
+            high_quality: 1
+        }, cookie, mixin_key);
         const pData = await fetchBiliJson(`https://api.bilibili.com/x/player/wbi/playurl?${signedQuery}`, {
             headers: { 'User-Agent': UA, 'Referer': REFERER, 'Cookie': cookie }
         });
