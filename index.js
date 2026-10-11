@@ -846,6 +846,42 @@ async function handleProxy(request, url, host) {
 export default {
     async fetch(request, env, ctx) {
         WORKER_ENV = env || {};
+        // WINDOWS_DASH_ROUTE_V1: insert immediately after WORKER_ENV = env || {};
+        if (new URL(request.url).pathname === '/api/windows-dash') {
+            const answer = (data, status = 200) => new Response(JSON.stringify(data), {
+                status, headers: {'Content-Type': 'application/json', 'Cache-Control': 'no-store'}
+            });
+            if (!env.WINDOWS_TOKEN || env.WINDOWS_TOKEN.length < 32)
+                return answer({error: 'WINDOWS_TOKEN not configured'}, 503);
+            if (request.headers.get('Authorization') !== 'Bearer ' + env.WINDOWS_TOKEN)
+                return answer({error: 'Unauthorized'}, 401);
+            if (request.method !== 'GET') return answer({error: 'GET required'}, 405);
+            try {
+                const params = new URL(request.url).searchParams;
+                const bv = params.get('bv');
+                const quality = Number(params.get('qn') || 80);
+                const page = Number(params.get('page') || 1);
+                if (!/^BV[a-zA-Z0-9]{10}$/.test(bv || '') || ![80,116,120].includes(quality)
+                    || !Number.isInteger(page) || page < 1) return answer({error:'Invalid input'},400);
+                const cookie = String(env.BILI_COOKIE || '').trim();
+                if (!cookie) return answer({error:'BILI_COOKIE missing'},400);
+                const headers = {'User-Agent': UA, 'Referer': REFERER, 'Cookie': cookie};
+                const info = await fetchBiliJson('https://api.bilibili.com/x/web-interface/view?bvid='+bv,{headers});
+                const cid = info.data?.pages?.[page-1]?.cid;
+                if (info.code !== 0 || !cid) return answer({error:'Video/page unavailable'},400);
+                const query = await signWbi({bvid:bv,cid,qn:quality,fnval:4048,fnver:0,fourk:1},cookie);
+                const data = await fetchBiliJson('https://api.bilibili.com/x/player/wbi/playurl?'+query,{headers});
+                const dash = data.data?.dash;
+                const videos = (dash?.video || []).filter(v=>v.id === quality && /^avc1/.test(v.codecs || ''));
+                const audios = (dash?.audio || []).filter(a=>/^mp4a/.test(a.codecs || ''));
+                videos.sort((a,b)=>(b.bandwidth||0)-(a.bandwidth||0));
+                audios.sort((a,b)=>(b.bandwidth||0)-(a.bandwidth||0));
+                if (!videos.length || !audios.length) return answer({error:'Requested H.264/AAC tracks unavailable; no silent 720p fallback'},422);
+                const track = t=>({url:t.baseUrl || t.base_url,codecs:t.codecs,width:t.width,height:t.height});
+                return answer({bv,page,quality,title:info.data.title,video:track(videos[0]),audio:track(audios[0])});
+            } catch { return answer({error:'Bilibili request failed; check existing diagnostic logs'},502); }
+        }
+
         const url = new URL(request.url);
         const host = url.origin;
         const path = url.pathname;
